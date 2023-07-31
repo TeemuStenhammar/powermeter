@@ -1,0 +1,65 @@
+version: '3.7'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto
+    container_name: mosquitto
+    restart: always
+    volumes:
+      - ./mosquitto:/mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+  influxdb:
+    image: influxdb:1.8.10
+    container_name: influxdb
+    restart: always
+    volumes:
+      - ./influxdb/var:/var/lib/influxdb
+    ports:
+      - "8086:8086"
+  telegraf:
+    image: telegraf
+    container_name: telegraf
+    restart: always
+    volumes:
+      - ./telegraf:/etc/telegraf
+    depends_on:
+      - influxdb
+      - mosquitto
+  grafana:
+    # Use :master until Grafana 6.5 is released because it has a fix for ARM
+    # See https://github.com/grafana/grafana/issues/19585
+    image: grafana/grafana:master
+    container_name: grafana
+    restart: always
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    user: "1000"
+    depends_on:
+      - influxdb
+  pulsecounter_maalampo:
+    build: pulsecounter
+    environment:
+      - CLIENT_NAME=maalampo
+      - TOPIC=maalampo/Whs
+      - GPIO_PIN=22
+    container_name: pulsecounter_maalampo
+    restart: always
+    depends_on:
+      - mosquitto
+    privileged: true
+  pulsecounter_ilmalampo:
+    build: pulsecounter
+    environment:
+      - CLIENT_NAME=ilmalampo
+      - TOPIC=ilmalampo/Whs
+      - GPIO_PIN=23
+    container_name: pulsecounter_ilmalampo
+    restart: always
+    depends_on:
+      - mosquitto
+    privileged: true
