@@ -181,7 +181,7 @@ while True:
       myupway_variable = myupway_variables[variable_id]
 
       real_value = parse_raw_value(v['CurrentValue'], myupway_variable['type'], myupway_variable['unit'])
-      if real_value:
+      if real_value is not None:
         client.publish(f'{TOPIC_PREFIX}/{myupway_variable["name"]}', real_value)
       #print(f'{myupway_variable["name"]} : {real_value}')
 
