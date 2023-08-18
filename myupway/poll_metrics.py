@@ -3,6 +3,7 @@ import re
 import sys
 import json
 import time
+import traceback
 import requests
 import paho.mqtt.client as mqtt
 
@@ -151,38 +152,41 @@ def parse_raw_value(raw_value, type, unit):
 
 
 while True:
-  session = requests.session()
-  auth_response = session.post('https://myupway.com/LogIn', {
-    'returnUrl': f'/System/{SYSTEM_ID}/Status/Overview',
-    'Email': EMAIL,
-    'Password': PASSWORD
-  })
-
-  # The login endpoint doesn't use HTTP 4XX status codes, so we check that it
-  # redirects to the "returnUrl" we requested
-  redirect = auth_response.history.pop()
-  if redirect.headers.get('Location') != f'/System/{SYSTEM_ID}/Status/Overview':
-    client.publish(f'{TOPIC_PREFIX}/failed_to_fetch_metrics', 1)
-  else:
-    # Fetch values
-    values_response = session.post("https://myupway.com/PrivateAPI/Values", {
-      "hpid": SYSTEM_ID,
-      "variables": variables_to_fetch
+  try:
+    session = requests.session()
+    auth_response = session.post('https://myupway.com/LogIn', {
+      'returnUrl': f'/System/{SYSTEM_ID}/Status/Overview',
+      'Email': EMAIL,
+      'Password': PASSWORD
     })
-    values = values_response.json()
 
-    # Post each value to MQTT
-    for v in values.get('Values', []):
-      variable_id = v.get('VariableId', 0)
-      if variable_id not in myupway_variables:
-        print(f'Variable {variable_id} not in MyUpway variables')
-        continue
+    # The login endpoint doesn't use HTTP 4XX status codes, so we check that it
+    # redirects to the "returnUrl" we requested
+    redirect = auth_response.history.pop()
+    if redirect.headers.get('Location') != f'/System/{SYSTEM_ID}/Status/Overview':
+      client.publish(f'{TOPIC_PREFIX}/failed_to_fetch_metrics', 1)
+    else:
+      # Fetch values
+      values_response = session.post("https://myupway.com/PrivateAPI/Values", {
+        "hpid": SYSTEM_ID,
+        "variables": variables_to_fetch
+      })
+      values = values_response.json()
 
-      myupway_variable = myupway_variables[variable_id]
+      # Post each value to MQTT
+      for v in values.get('Values', []):
+        variable_id = v.get('VariableId', 0)
+        if variable_id not in myupway_variables:
+          print(f'Variable {variable_id} not in MyUpway variables')
+          continue
 
-      real_value = parse_raw_value(v['CurrentValue'], myupway_variable['type'], myupway_variable['unit'])
-      if real_value is not None:
-        client.publish(f'{TOPIC_PREFIX}/{myupway_variable["name"]}', real_value)
-      #print(f'{myupway_variable["name"]} : {real_value}')
+        myupway_variable = myupway_variables[variable_id]
 
-  time.sleep(INTERVAL)
+        real_value = parse_raw_value(v['CurrentValue'], myupway_variable['type'], myupway_variable['unit'])
+        if real_value is not None:
+          client.publish(f'{TOPIC_PREFIX}/{myupway_variable["name"]}', real_value)
+        #print(f'{myupway_variable["name"]} : {real_value}')
+
+    time.sleep(INTERVAL)
+  except:
+    traceback.print_exc()
