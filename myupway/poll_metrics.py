@@ -3,9 +3,11 @@ import re
 import sys
 import json
 import time
-import traceback
 import requests
 import paho.mqtt.client as mqtt
+from dotenv import load_dotenv
+
+load_dotenv()
 
 TYPE_BOOLEAN_ON_OFF = 'boolean_on_off'
 TYPE_BOOLEAN_YES_NO = 'boolean_yes_no'
@@ -95,38 +97,14 @@ myupway_variables = {
 
 variables_to_fetch = [40067, 40014, 40013, 40004, 43084, 47212]
 
-SYSTEM_ID = os.environ.get('SYSTEM_ID')
-EMAIL = os.environ.get('EMAIL')
-PASSWORD = os.environ.get('PASSWORD')
-NAME = os.environ.get('CLIENT')
-TOPIC_PREFIX = os.environ.get('TOPIC_PREFIX')
-INTERVAL = int(os.environ.get('INTERVAL'))
-
-print(f'Starting metric poll client {NAME} to post metrics to {TOPIC_PREFIX}/#')
-
-connected = False
+SYSTEM_ID = os.getenv('SYSTEM_ID')
+EMAIL = os.getenv('EMAIL')
+PASSWORD = os.getenv('PASSWORD')
+NAME = os.getenv('CLIENT')
+TOPIC_PREFIX = os.getenv('TOPIC_PREFIX')
 
 
-def on_connect(client, userdata, flags, rc):
-  if rc == 0:
-    print('Connected to broker')
-
-    global connected
-    connected = True
-  else:
-    print('Connection failed')
-    client.loop_stop()
-
-
-client = mqtt.Client(f'MyUpway-Metric-Poller-{NAME}-Pub')
-client.on_connect = on_connect
-client.connect('mosquitto')
-client.loop_start()
-
-while connected != True:
-  time.sleep(0.1)
-
-
+# Get values from MyUpway
 def parse_raw_value(raw_value, type, unit):
     if raw_value == "--":
         return None
@@ -151,42 +129,57 @@ def parse_raw_value(raw_value, type, unit):
     return raw_value
 
 
-while True:
-  try:
-    session = requests.session()
-    auth_response = session.post('https://myupway.com/LogIn', {
-      'returnUrl': f'/System/{SYSTEM_ID}/Status/Overview',
-      'Email': EMAIL,
-      'Password': PASSWORD
-    })
+session = requests.session()
+auth_response = session.post('https://myupway.com/LogIn', {
+  'returnUrl': f'/System/{SYSTEM_ID}/Status/Overview',
+  'Email': EMAIL,
+  'Password': PASSWORD
+})
 
-    # The login endpoint doesn't use HTTP 4XX status codes, so we check that it
-    # redirects to the "returnUrl" we requested
-    redirect = auth_response.history.pop()
-    if redirect.headers.get('Location') != f'/System/{SYSTEM_ID}/Status/Overview':
-      client.publish(f'{TOPIC_PREFIX}/failed_to_fetch_metrics', 1)
-    else:
-      # Fetch values
-      values_response = session.post("https://myupway.com/PrivateAPI/Values", {
-        "hpid": SYSTEM_ID,
-        "variables": variables_to_fetch
-      })
-      values = values_response.json()
+# The login endpoint doesn't use HTTP 4XX status codes, so we check that it
+# redirects to the "returnUrl" we requested
+redirect = auth_response.history.pop()
+if redirect.headers.get('Location') != f'/System/{SYSTEM_ID}/Status/Overview':
+  sys.exit(1)
 
-      # Post each value to MQTT
-      for v in values.get('Values', []):
-        variable_id = v.get('VariableId', 0)
-        if variable_id not in myupway_variables:
-          print(f'Variable {variable_id} not in MyUpway variables')
-          continue
+# Fetch values
+values_response = session.post("https://myupway.com/PrivateAPI/Values", {
+  "hpid": SYSTEM_ID,
+  "variables": variables_to_fetch
+})
+values = values_response.json()
 
-        myupway_variable = myupway_variables[variable_id]
+# Connect to MQTT broker
+connected = False
+def on_connect(client, userdata, flags, rc):
+  if rc == 0:
+    print('Connected to broker')
+    global connected
+    connected = True
+  else:
+    print('Connection failed')
+    client.loop_stop()
+    sys.exit(1)
 
-        real_value = parse_raw_value(v['CurrentValue'], myupway_variable['type'], myupway_variable['unit'])
-        if real_value is not None:
-          client.publish(f'{TOPIC_PREFIX}/{myupway_variable["name"]}', real_value)
-        #print(f'{myupway_variable["name"]} : {real_value}')
+client = mqtt.Client(f'MyUpway-Metric-Poller-{NAME}-Pub')
+client.on_connect = on_connect
+client.connect('mosquitto')
+client.loop_start()
 
-    time.sleep(INTERVAL)
-  except:
-    traceback.print_exc()
+while connected != True:
+  time.sleep(0.1)
+
+# Publish each value to MQTT
+for v in values.get('Values', []):
+  variable_id = v.get('VariableId', 0)
+  if variable_id not in myupway_variables:
+    print(f'Variable {variable_id} not in MyUpway variables')
+    continue
+
+  myupway_variable = myupway_variables[variable_id]
+
+  real_value = parse_raw_value(v['CurrentValue'], myupway_variable['type'], myupway_variable['unit'])
+  if real_value is not None:
+    client.publish(f'{TOPIC_PREFIX}/{myupway_variable["name"]}', real_value)
+
+time.sleep(1)

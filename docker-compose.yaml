@@ -71,7 +71,6 @@ services:
       - SYSTEM_ID=187272
       - EMAIL=${MYUPWAYEMAIL}
       - PASSWORD=${MYUPWAYPWD}
-      - INTERVAL=120
     container_name: myupway_poller
     restart: always
     depends_on:

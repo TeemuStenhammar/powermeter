@@ -1,9 +1,12 @@
-FROM python:latest
+FROM python:3.6.12-alpine3.12
 
 RUN pip install paho-mqtt
 RUN pip install requests
+RUN pip install python-dotenv
 
-WORKDIR /usr/app/src
 COPY poll_metrics.py ./
+COPY crontab ./
 
-CMD [ "python", "-u", "./poll_metrics.py" ]
+RUN crontab crontab
+
+CMD env > .env && crond -f

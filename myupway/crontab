@@ -1,0 +1,1 @@
+*/5 * * * * python /poll_metrics.py >> /logfile
