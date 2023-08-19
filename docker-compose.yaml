@@ -78,6 +78,9 @@ services:
       - mosquitto
   spot_price:
     build: spot-price
+    environment:
+      - CLIENT=spot-price
+      - TOPIC=spot/price
     container_name: spot_price
     restart: always
     depends_on:

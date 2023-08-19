@@ -4,9 +4,12 @@ import time
 import requests
 import paho.mqtt.client as mqtt
 from datetime import datetime
+from dotenv import load_dotenv
 
-TOPIC = 'spot/price'
-NAME = 'spot-client'
+load_dotenv()
+
+TOPIC = os.getenv('TOPIC')
+NAME = os.getenv('CLIENT')
 URL = 'https://api.porssisahko.net/v1/price.json'
 
 # Get current date and hour
