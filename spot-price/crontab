@@ -1,0 +1,1 @@
+1 * * * * python /spot_price.py >> /logfile
