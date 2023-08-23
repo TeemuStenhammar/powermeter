@@ -79,7 +79,7 @@ services:
     build: spot-price
     environment:
       - CLIENT=spot-price
-      - TOPIC=spot/price
+      - TOPIC_PREFIX=spot
     container_name: spot_price
     restart: always
     depends_on:
