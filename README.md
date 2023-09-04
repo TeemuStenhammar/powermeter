@@ -1,11 +1,24 @@
 # Powermeter stack
 
-This project was accomplished by using [koenvervloesem](https://github.com/koenvervloesem/ruuvitag-demo) nice stack from their RuuviTag Demo project, and [Jalle19 pyupway](https://github.com/Jalle19/pyupway) library. This Readme is mostly copied from the former with additions from what I did there.
+This project was accomplished by using [koenvervloesem](https://github.com/koenvervloesem/ruuvitag-demo) 
+nice stack from their RuuviTag Demo project, and [Jalle19 pyupway](https://github.com/Jalle19/pyupway) library. 
+This Readme is mostly copied from the former with additions from what I did there.
 
 ## System requirements
-The project was designed on Rasperry Pi 4 and Raspbian OS.
+The project was designed on Rasperry Pi 4 and Raspbian OS. You need a Linux system with Bluetooth Low Energy 
+(BLE) adapter, so at least Bluetooth 4.0.
 
 All instructions assume the first configuration. It should run on other Linux systems with minor adjustments, though.
+
+### Checking your Bluetooth adapter
+Your system should have a Bluetooth Low Energy adapter, as is available in all recent Raspberry Pi models. 
+You can verify this with:
+
+```shell
+hciconfig -a
+```
+
+This should show a device **hci0** as **UP RUNNING** and the **LMP Version** should be at least 4.0.
 
 ### Installing Docker and Docker Compose
 Docker can be installed with:
@@ -59,6 +72,11 @@ The next configuration bit is to create an account to [myUpway](https://myupway.
 * Update /myupway/poll_metrics.py to match your selection
 * Set you username and password to .env file
 
+Add the MAC addresses of your RuuviTag sensors to the `bt-mqtt-gateway/config.yaml` file. You can find these by scanning for Bluetooth Low Energy devices in your neighborhood:
+
+```shell
+sudo hcitool lescan
+```
 
 ## Getting the stack up
 
@@ -66,7 +84,7 @@ The next configuration bit is to create an account to [myUpway](https://myupway.
 docker-compose up -d
 ```
 
-This starts seven Docker containers:
+This starts eight Docker containers:
 
   * [Mosquitto](https://mosquitto.org/): Receives the MQTT messages from bt-mqtt-gateway and relays them to anyone who is interested.
   * [Telegraf](https://www.influxdata.com/time-series-platform/telegraf/): Collects MQTT messages from Mosquitto and sends the values to InfluxDB.
@@ -75,12 +93,13 @@ This starts seven Docker containers:
   * 2x Pulsecounter: Reads S0 pulse output from electricity meters connected to Raspberry GPIO
   * myUpway Poller: Polls myUpway for information about Jämä heat machine
   * Spot Price: Uses [this API](https://www.porssisahko.net/api) to fetch the current price and price 10h into future for electricity and publishes those values to MQTT
+  * [bt-mqtt-gateway](https://github.com/zewelor/bt-mqtt-gateway): Reads RuuviTag sensor measurements using Bluetooth Low Energy and forwards them to a MQTT broker.* [bt-mqtt-gateway](https://github.com/zewelor/bt-mqtt-gateway): Reads RuuviTag sensor measurements using Bluetooth Low Energy and forwards them to a MQTT broker.
 
 You have access to:
 
   * The Grafana dashboard on http://localhost:3000
 
-## Tiering the stack down
+## Tearing the stack down
 
 ```shell
 docker-compose down

@@ -68,7 +68,7 @@ services:
     environment:
       - CLIENT=myupway
       - TOPIC_PREFIX=maalampo
-      - SYSTEM_ID=187272
+      - SYSTEM_ID=${MYUPWAYSYSTEMID}
       - EMAIL=${MYUPWAYEMAIL}
       - PASSWORD=${MYUPWAYPWD}
     container_name: myupway_poller
@@ -82,5 +82,20 @@ services:
       - TOPIC_PREFIX=spot
     container_name: spot_price
     restart: always
+    depends_on:
+      - mosquitto
+  bt-mqtt-gateway:
+    image: zewelor/bt-mqtt-gateway
+    container_name: bt-mqtt-gateway
+    restart: always
+    volumes:
+      - ./bt-mqtt-gateway/config.yaml:/application/config.yaml
+    # These capabilities are needed for Bluetooth
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    # The Docker host should have working Bluetooth
+    network_mode: host
     depends_on:
       - mosquitto
